@@ -1,0 +1,67 @@
+---
+title: "HW 6 Class Functions"
+author: "Rocio Silenciario"
+date: "2025-04-21"
+output: pdf_document
+---
+```{r}
+# (A. Can you improve this analysis code?
+library(bio3d)
+s1 <- read.pdb("4AKE") # kinase with drug
+s2 <- read.pdb("1AKE") # kinase no drug
+s3 <- read.pdb("1E4Y") # kinase with drug
+s1.chainA <- trim.pdb(s1, chain="A", elety="CA")
+s2.chainA <- trim.pdb(s2, chain="A", elety="CA")
+s3.chainA <- trim.pdb(s1, chain="A", elety="CA")
+s1.b <- s1.chainA$atom$b
+s2.b <- s2.chainA$atom$b
+s3.b <- s3.chainA$atom$b
+plotb3(s1.b, sse=s1.chainA, typ="l", ylab="Bfactor")
+plotb3(s2.b, sse=s2.chainA, typ="l", ylab="Bfactor")
+plotb3(s3.b, sse=s3.chainA, typ="l", ylab="Bfactor")
+
+```
+
+> Q6. How would you generalize the original code above to work with any set of input
+protein structures?
+
+```{r}
+# Define a function to analyze protein-drug interactions and plot B-factors
+# Input: pdb_id - the PDB ID of the protein (e.g., "4AKE")
+#        chain - the protein chain we want to analyze (i.e. "A" in this example)
+#        plot_type - the type of plot (i.e. "l" in this example)
+plot_bfactor_interaction <- function(pdb_id, chain = "A", plot_type = "l") {
+  
+  # Read the PDB file into R using the PDB ID
+  # This step loads the protein structure into R
+  pdb <- read.pdb(pdb_id)
+  
+  # Trim the PDB data to focus on only C-alpha atoms from the specified chain
+  # Trimming helps reduce the amount of data, focusing on specific parts of the protein
+  chain_data <- trim.pdb(pdb, chain = chain, elety = "CA")
+  
+  # Extract the B-factors (which indicate the flexibility of each atom)
+  # B-factors show how much atoms move.
+  b_factors <- chain_data$atom$b  
+  
+  # Plot the B-factors to visualize which parts of the protein are flexible/rigid
+  # The plot shows flexibility in the protein structure. B-factors are directly correlated 
+  # with more flexibility. 
+  plotb3(b_factors, sse = chain_data, typ = plot_type, ylab = "B-factor", 
+         main = paste("B-factor Plot for", pdb_id))
+  
+  # Return the B-factors so they can be used later
+  return(b_factors)
+}
+
+# Example 1: Use the function to analyze and plot the B-factors for the protein "1E4Y"
+# The plot will display the B-factor plot for protein "1E4Y" for chain "A"
+b_factors_4AKE <- plot_bfactor_interaction("1E4Y", chain = "A", plot_type = "l")
+
+# Example 2: Use the function to analyze and plot the B-factors for the protein "1AKE"
+# The plot will display the B-factor plot for protein "1AKE" for chain "A"
+b_factors_1AKE <- plot_bfactor_interaction("1AKE", chain = "A", plot_type = "l")
+```
+
+
+
