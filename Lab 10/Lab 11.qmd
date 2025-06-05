@@ -1,0 +1,54 @@
+---
+title: "Class 11: Comparative Structure Analysis"
+author: "Rocio Silenciario"
+format: html
+---
+
+Load up the packages we will need for analysis of protein structure sets. 
+
+```{r}
+library(bio3d)
+```
+
+We will analyze the ADK starting with a single ADK database accession code: "1ake_A"
+
+```{r}
+id <- "1ake_A"
+aa <- get.seq(id)
+aa
+```
+Now we can search the PDB database to find all related entries. 
+```{r}
+blast <- blast.pdb(aa)
+```
+
+```{r}
+attributes(blast)
+```
+
+```{r}
+head(blast$hit.tbl)
+```
+
+Make a little summary figure of these results:
+```{r}
+hits <- plot(blast)
+```
+
+Our "top hits" i.e. the most similar entries in the database are:
+
+```{r}
+hits$pdb.id
+```
+
+
+
+
+
+
+
+
+
+
+
+

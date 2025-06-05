@@ -1,0 +1,151 @@
+---
+title: "Class10: Structural Bioinformatics"
+author: "Rocio Silenciario PID: A17100070"
+format: pdf
+toc: true
+---
+
+## The PDB Database
+
+The main repository of biomolecular structure data is called the [Protein Data Bank](https://www.rcsb.org) (PDB for short). It is the second oldest database (after GenBank).
+
+What is currently in the PDB? We can access current composition stats [here](https://www.rcsb.org/stats)
+
+```{r}
+stats <- read.csv (file = "Data Export Summary.csv", row.names = 1)
+head(stats)
+```
+
+
+> Q1: What percentage of structures in the PDB are solved by X-Ray and Electron Microscopy?
+
+```{r}
+x <- stats$X.ray
+
+# Substitute comma for nothing
+y <- gsub(",", "", x)
+
+# Convert to numeric
+sum(as.numeric(y))
+```
+
+Turn this snippet into a function so I can use it any time I have this comma problem (i.e. the other columns of this 'stats' table)
+
+```{r}
+comma.sum <- function(x) {
+  # Substitute comma for nothing
+  y <- gsub(",", "", x)
+
+  # Convert to numeric and sum
+  return(sum(as.numeric(y)))
+
+}
+```
+
+```{r}
+xray.sum <- comma.sum(stats$X.ray)
+em.sum <- comma.sum(stats$EM)
+total.sum <- comma.sum(stats$Total)
+```
+
+```{r}
+xray.sum/total.sum*100
+```
+
+```{r}
+em.sum/total.sum*100
+```
+
+> Q2: What proportion of structures in the PDB are protein?
+
+```{r}
+protein.sum <- comma.sum(stats[1,7])
+total.protein.sum <- comma.sum(stats[,7])
+protein.sum/total.protein.sum*100
+```
+
+
+>Q3. Type HIV in the PDB website search box on the home page and determine how many HIV-1 protease structures are in the current PDB?
+
+SKIPPED
+
+## 2. Visualizing with Mol-star
+
+Explore the HIV-1 protease structure with PDB code: `1HSG` 
+Mol-star homepage at: https://molstar.org/viewer/.
+
+![Figure 1. A first view of HIV-Pr](1HSG.png)
+
+![Figure 2. Molecular surface showing binding cavity ](1HSG1.png)
+
+![Figure 3. The catatilically important ASP amino acids and drug interacting HOH 308 water molecule](1HSG2.png)
+
+## 3. Using the bio3d package in R
+
+The Bio3D package is focused on structural bioinformatics analysis and allows us to read and analyze PDB (and related) data.
+
+```{r}
+library(bio3d)
+```
+
+```{r}
+pdb <- read.pdb("1hsg")
+pdb
+```
+
+```{r}
+attributes(pdb)
+```
+
+We can see atom data with `pdb$atom`:
+
+```{r}
+head(pdb$atom)
+```
+
+```{r}
+head(pdbseq(pdb))
+```
+
+We can make quick 3D viz with the `view.pdb()` function.
+
+```{r}
+library(bio3d)
+library(NGLVieweR)
+```
+
+```{r}
+sel <- atom.select(pdb, resno=25)
+
+ # view.pdb(pdb, cols=c("green", "orange"),
+  #       highlight = sel,
+  #       highlight.style = "spacefill") |>
+ # setRock()
+```
+
+## Predicting functional motions of a single structure
+
+We can finish off today with a bioinformatics prediction of the functional motions of a protein.
+
+We will run a Normal Mode Analysis (NMA)
+
+```{r}
+adk <- read.pdb("6s36")
+adk
+```
+
+```{r}
+m <- nma(adk)
+plot(m)
+```
+
+```{r}
+ # view.nma(m)
+```
+
+We can write-out a trajectory of the predicted dynamics and view this in Mol-star.
+
+```{r}
+mktrj(m, file="nma.pdb")
+```
+
