@@ -1,0 +1,364 @@
+---
+title: "Class 13: RNASeq Analysis"
+format: pdf
+date: 5/13/2025
+author: Rocio Silenciario
+toc: TRUE
+---
+
+#Background
+Today we will analyze some RNA Sequencing data on the effects of a common steroid drug on airway cell lines. 
+
+There are two main inputs we need for this analysis:
+
+- `countData`: counts for genes in rows with experiments in the columns 
+-`colData`: or metadata that tells us about the design of the experiment (i.e. what is in the columns of `countData`)
+
+```{r}
+counts <- read.csv("airway_scaledcounts.csv", row.names = 1)
+metadata<- read.csv("airway_metadata.csv", row.names =1)
+```
+
+> Q1. How many genes are in this dataset?
+
+```{r}
+nrow(counts)
+```
+
+> Q2. How many ‘control’ cell lines do we have? 
+
+```{r}
+metadata$dex
+table(metadata$dex)
+```
+```{r}
+sum(metadata$dex=="control")
+```
+
+# Toy differential gene expression 
+
+Let's try finding the average or mean of the "control" and "treated" columns and see if they differ. 
+
+-1. First we need to find all "control" columns
+-2. Extract just the "control" values for each gene
+-3. Calculate the `mean()` for each gene "control" values
+
+```{r}
+all(colnames(counts) == metadata$id)
+```
+
+The $dex columns tells me whether we have "control" or "treated"
+```{r}
+control.inds <- metadata$dex == "control"
+```
+
+Extract just the "control" values for all genes
+```{r}
+control.counts <- counts[,control.inds]
+```
+
+Calculate the mean value for each gene in these "control" columns
+```{r}
+control.mean <- rowMeans(control.counts)
+```
+> Q3. Do the same for "treated" to get a `treated.mean`
+
+```{r}
+treated.inds <-metadata$dex == "treated"
+treated.counts <-  counts[,treated.inds]
+treated.mean <- rowMeans(treated.counts)
+head(treated.mean)
+```
+
+> Q4.Make a plot of `control.mean` vs `treated.mean`
+
+Let's store our mean values together in a data.frame for easier book-keeping
+```{r}
+meancounts <- data.frame(control.mean, treated.mean)
+head(meancounts)
+```
+```{r}
+plot(meancounts)
+```
+
+```{r}
+library(ggplot2)
+ggplot(meancounts)+
+  aes(control.mean, treated.mean)+
+  geom_point(alpha=0.3)
+```
+
+We totally need to log transform this data as it is so heavily skewed!
+
+```{r}
+plot(meancounts, log="xy")
+```
+```{r}
+library(ggplot2)
+
+ggplot(meancounts)+
+  aes(control.mean, treated.mean)+
+  geom_point(alpha=0.3)+
+  scale_x_log10()+
+  scale_y_log10()
+```
+```{r}
+# TREATED/CONTROL
+
+log2(20/20)
+```
+
+Doubling of the amount
+```{r}
+log2(40/20)
+```
+Half the amount
+```{r}
+log2(10/20)
+```
+
+A common "rule-of-thumb" is to focus on genes with a log2 "fold-change" of +2 as so-called UP REGULATED and -2 as DOWN REGULATED. 
+
+```{r}
+log2(80/20)
+# 4x the original value
+```
+
+Let's add a log2 fold-change value to our `meancounts` data.frame
+
+```{r}
+meancounts$log2fc <- log2(meancounts$treated.mean/meancounts$control.mean)
+head(meancounts)
+```
+
+> Q. Remove any "zero count" genes from our dataset for further analysis 
+
+```{r}
+to.keep <- rowSums(meancounts[,1:2]==0) == 0
+sum(to.keep)
+#genes with non-zero counts
+```
+
+```{r}
+mycounts <- meancounts[to.keep,]
+head(mycounts)
+```
+
+> Q. How many genees are "up" regulated at a log2fc threshold of +2?
+
+```{r}
+sum(mycounts$log2fc >= 2)
+```
+
+> Q. How many genees are "down" regulated at a log2fc threshold of -2?
+
+```{r}
+sum(mycounts$log2fc <= -2)
+```
+
+Hold on, we are missing stats. Is it actually significant? We need to calculate the p-value to make sure of this. 
+
+#DESeq2 analysis
+
+Let's do this properly and consider the stats - are the differences in the means significant?
+
+We will use DESeq2 to do this:
+
+```{r, message=FALSE}
+library(DESeq2)
+```
+
+The first function we will use for this package sets up the input in the particular format that DESeq2 wants:
+
+```{r, message=FALSE}
+dds <- DESeqDataSetFromMatrix(countData = counts, colData= metadata, design = ~dex)
+```
+
+We can now run our DESeq analysis
+
+```{r}
+dds <- DESeq(dds)
+res <- results(dds)
+```
+
+
+Peak at results
+```{r}
+head(res)
+```
+
+# Results figure: Volcano Plots
+
+Plot of the Log2fc vs the P-value 
+
+```{r}
+plot(res$log2FoldChange, res$padj)
+```
+
+This p-value data is again heavily skewed, so let's log transfrom it.
+
+```{r}
+plot(res$log2FoldChange, log(res$padj))
+```
+
+We can flip the y-axis by adding a minus sign. This will make it easier to interpret
+```{r}
+plot(res$log2FoldChange, -log(res$padj))
+abline(v=-2, col="red")
+abline(v=+2, col="red")
+abline(h=-log(0.05), col="red")
+```
+
+Let's add some color. 
+
+```{r}
+mycols <- rep("gray", nrow(res))
+mycols [res$log2FoldChange <= -2] <- "blue"
+mycols [res$log2FoldChange >= +2] <- "red"
+mycols [res$padj >= 0.05 ] <- "gray"
+plot(res$log2FoldChange, -log(res$padj), col=mycols)
+abline(v=-2, col="darkgreen")
+abline(v=+2, col="darkgreen")
+abline(h=-log(0.05), col="darkgreen")
+```
+
+```{r}
+head(res)
+```
+Make a ggplot volcano plot with colors and lines as annotation along with nice axis labels.
+
+```{r}
+mycols <- rep("gray", nrow(res))
+mycols [res$log2FoldChange <= -2] <- "blue"
+mycols [res$log2FoldChange >= +2] <- "red"
+mycols [res$padj >= 0.05 ] <- "gray"
+
+ggplot(as.data.frame((res)))+ aes(res$log2FoldChange,-log(res$padj))+
+  geom_point(col=mycols, ) + xlab("Log2 Fold Change")+ ylab("Adjusted P-value")+ geom_vline(xintercept = -2, col= "darkgreen") +
+geom_vline(xintercept = +2, col= "darkgreen") + geom_hline(yintercept = -log(0.05), col="darkgreen") + theme_bw()
+```
+## We need to add gene annotation
+
+Gene symbols and different database IDs
+
+## Pathway Analysis
+
+Find what biological pathways my differentially expressed genes participate in. 
+
+Pathway analysis (also known as gene set analysis or over-representation analysis), aims to reduce the complexity of interpreting.
+
+```{r}
+head(res)
+```
+
+We first need to add gene symbols (e.g. HBB etc.) so we know what genes we are dealing with. We need to translate between Ensemble, ids that we have in the rownames of `res`.
+
+Install from bioconductor with `BiocManager::install("AnnotationDbi")
+Bio
+```{r}
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+```
+
+What different database ID types can I translate between.
+
+```{r}
+columns(org.Hs.eg.db)
+```
+
+Let's "map" between "ENSEMBL" and "SYMBOL" (i.e. gene symbol).
+
+```{r}
+res$symbol <- mapIds(x=org.Hs.eg.db, 
+              keys=rownames(res),
+             keytype = "ENSEMBL",
+              column= "SYMBOL")
+head(res)
+```
+
+Add a few more ID mappings including "GENENAME" and "ENTREZID".
+
+```{r}
+res$name <- mapIds(x=org.Hs.eg.db, 
+              keys=rownames(res),
+             keytype = "ENSEMBL",
+              column= "GENENAME")
+
+res$entrez <- mapIds(x=org.Hs.eg.db, 
+              keys=rownames(res),
+             keytype = "ENSEMBL",
+              column= "ENTREZID")
+head(res)
+```
+
+Let's ensure to save our annotated results to a file.
+
+```{r}
+write.csv(res, file="my_annotated_results.csv")
+```
+
+# Pathway Analysis
+
+Install the packages we need for pathway analysis: Run in your R console (i.e. not your Quarto Doc!)
+
+`BiocManager::install( c("pathview", "gage"), "gageData"))`
+
+```{r}
+library(pathview)
+library(gage)
+library(gageData)
+```
+
+Let's take a peak at gageData.
+
+```{r}
+data(kegg.sets.hs)
+
+#Examine the first 2 pathways in this kegg set for humans
+head(kegg.sets.hs, 2)
+```
+
+To run pathway analysis we will use the `gage()` function and it requires a wee "vector of importance". We will use our Log2FC results from our `res` object.
+
+```{r}
+foldchanges = res$log2FoldChange
+names(foldchanges) = res$entrez
+head(foldchanges)
+```
+
+```{r}
+# Get the results
+keggres = gage(foldchanges, gsets=kegg.sets.hs)
+```
+
+What's in the returned `keggres` object
+
+```{r}
+attributes(keggres)
+```
+
+```{r}
+head(keggres$less)
+```
+
+We can pass our foldchange vector (our results) together with any of these highlighted pathway IDs to see how our genes
+
+```{r}
+pathview(gene.data=foldchanges, pathway.id = "hsa05310")
+```
+
+![The Asthma pathway overlaps with our differientally expressed genes](hsa05310.pathview.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
