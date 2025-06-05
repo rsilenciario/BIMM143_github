@@ -430,7 +430,7 @@ significant amount of variability between N. Ireland and Wales &
 Scotland.
 
 The second major result is contained in the `pca$rotation` object or
-component. Let’s plot this to see what PCA is picking up…
+component. Let’s plot this to see what the PCA is picking up...
 
 ``` r
 ggplot(pca$rotation)+
